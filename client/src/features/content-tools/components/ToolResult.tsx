@@ -28,7 +28,7 @@ export function ToolResult({ label, value, meta, className }: ToolResultProps) {
   return (
     <div
       className={cn(
-        'rounded-2xl border border-border bg-muted/40 p-4',
+        'rounded-2xl border border-border bg-card p-4',
         className,
       )}
     >
@@ -55,7 +55,9 @@ export function ToolResult({ label, value, meta, className }: ToolResultProps) {
       </div>
 
       {typeof value === 'string' ? (
-        <p className="whitespace-pre-wrap text-sm leading-relaxed">{value}</p>
+        <p className="whitespace-pre-wrap text-sm leading-relaxed text-foreground">
+          {value}
+        </p>
       ) : (
         <ul className="flex flex-wrap gap-2">
           {value.map((keyword) => (

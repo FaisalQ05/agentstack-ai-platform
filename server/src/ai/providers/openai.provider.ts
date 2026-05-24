@@ -33,4 +33,23 @@ export class OpenAiProvider implements AiProvider {
       provider: this.name,
     };
   }
+
+  async *streamComplete(
+    options: AiCompletionOptions,
+  ): AsyncGenerator<string> {
+    const model = options.model ?? this.defaultModel;
+
+    const stream = await this.client.chat.completions.create({
+      model,
+      messages: options.messages,
+      stream: true,
+    });
+
+    for await (const chunk of stream) {
+      const delta = chunk.choices[0]?.delta?.content;
+      if (delta) {
+        yield delta;
+      }
+    }
+  }
 }

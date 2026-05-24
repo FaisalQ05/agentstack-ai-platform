@@ -2,6 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { MessageRole } from '../../generated/prisma/client';
 import { AiService } from '../ai/ai.service';
 import { AiChatMessage } from '../ai/interfaces/ai-provider.interface';
+import { TypedConfigService } from '../config/typed-config.service';
 import { PrismaService } from '../prisma/prisma.service';
 import {
   ChatRequestDto,
@@ -10,87 +11,32 @@ import {
   ConversationSummaryDto,
 } from './dto/chat.dto';
 
+export interface ChatPreparedContext {
+  conversationId: string;
+  aiMessages: AiChatMessage[];
+}
+
 @Injectable()
 export class ChatService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly aiService: AiService,
+    private readonly config: TypedConfigService,
   ) {}
 
   async chat(dto: ChatRequestDto): Promise<ChatResponseDto> {
-    console.log('IN CHAT SERVICE');
-    console.log({ dto });
-
-    const conversation = dto.conversationId
-      ? await this.findConversation(dto.conversationId)
-      : await this.createConversation(dto.system);
-
-    console.log({ conversation });
-
-    if (
-      dto.conversationId &&
-      dto.system &&
-      dto.system !== conversation.systemPrompt
-    ) {
-      console.log('UPDATE SYSTEM PROMPT');
-
-      await this.prisma.conversation.update({
-        where: { id: conversation.id },
-        data: { systemPrompt: dto.system },
-      });
-      conversation.systemPrompt = dto.system;
-    }
-
-    console.log({ conversation });
-
-    await this.prisma.message.create({
-      data: {
-        conversationId: conversation.id,
-        role: MessageRole.user,
-        content: dto.message,
-      },
+    const prepared = await this.prepareChat(dto);
+    const completion = await this.aiService.complete({
+      messages: prepared.aiMessages,
     });
 
-    if (!conversation.title) {
-      console.log('UPDATE CONVERSATION TITLE');
-      await this.prisma.conversation.update({
-        where: { id: conversation.id },
-        data: { title: this.buildTitle(dto.message) },
-      });
-    }
-
-    const history = await this.prisma.message.findMany({
-      where: { conversationId: conversation.id },
-      orderBy: { createdAt: 'asc' },
-    });
-
-    console.log({ history });
-
-    const aiMessages = this.buildAiMessages(conversation.systemPrompt, history);
-
-    console.log({ aiMessages });
-
-    const completion = await this.aiService.complete({ messages: aiMessages });
-
-    console.log({ completion });
-
-    const assistantMessage = await this.prisma.message.create({
-      data: {
-        conversationId: conversation.id,
-        role: MessageRole.assistant,
-        content: completion.content,
-      },
-    });
-
-    console.log({ assistantMessage });
-
-    await this.prisma.conversation.update({
-      where: { id: conversation.id },
-      data: { updatedAt: new Date() },
-    });
+    const assistantMessage = await this.saveAssistantMessage(
+      prepared.conversationId,
+      completion.content,
+    );
 
     return {
-      conversationId: conversation.id,
+      conversationId: prepared.conversationId,
       message: {
         id: assistantMessage.id,
         role: 'assistant',
@@ -102,8 +48,85 @@ export class ChatService {
     };
   }
 
-  async listConversations(): Promise<ConversationSummaryDto[]> {
-    return await this.prisma.conversation
+  async prepareChat(dto: ChatRequestDto): Promise<ChatPreparedContext> {
+    const conversation = dto.conversationId
+      ? await this.findConversation(dto.conversationId)
+      : await this.createConversation(dto.system);
+
+    if (
+      dto.conversationId &&
+      dto.system &&
+      dto.system !== conversation.systemPrompt
+    ) {
+      await this.prisma.conversation.update({
+        where: { id: conversation.id },
+        data: { systemPrompt: dto.system },
+      });
+      conversation.systemPrompt = dto.system;
+    }
+
+    await this.prisma.message.create({
+      data: {
+        conversationId: conversation.id,
+        role: MessageRole.user,
+        content: dto.message,
+      },
+    });
+
+    if (!conversation.title) {
+      await this.prisma.conversation.update({
+        where: { id: conversation.id },
+        data: { title: this.buildTitle(dto.message) },
+      });
+    }
+
+    const history = await this.prisma.message.findMany({
+      where: { conversationId: conversation.id },
+      orderBy: { createdAt: 'asc' },
+    });
+
+    return {
+      conversationId: conversation.id,
+      aiMessages: this.buildAiMessages(conversation.systemPrompt, history),
+    };
+  }
+
+  streamCompletion(aiMessages: AiChatMessage[]): AsyncGenerator<string> {
+    return this.aiService.streamComplete({ messages: aiMessages });
+  }
+
+  async saveAssistantMessage(conversationId: string, content: string) {
+    const trimmed = content.trim();
+
+    if (!trimmed) {
+      throw new Error('AI returned an empty response');
+    }
+
+    const assistantMessage = await this.prisma.message.create({
+      data: {
+        conversationId,
+        role: MessageRole.assistant,
+        content: trimmed,
+      },
+    });
+
+    await this.prisma.conversation.update({
+      where: { id: conversationId },
+      data: { updatedAt: new Date() },
+    });
+
+    return assistantMessage;
+  }
+
+  getStreamMeta() {
+    return {
+      provider: this.aiService.activeProvider,
+      model: this.config.ai.model,
+    };
+  }
+
+  listConversations(): Promise<ConversationSummaryDto[]> {
+    return this.prisma.conversation
       .findMany({
         orderBy: { updatedAt: 'desc' },
         select: {

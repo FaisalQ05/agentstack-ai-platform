@@ -31,3 +31,21 @@ export interface ConversationSummary {
 export interface ConversationDetail extends ConversationSummary {
   messages: ChatMessage[];
 }
+
+export interface ChatStreamMeta {
+  conversationId: string;
+  provider: string;
+  model: string;
+}
+
+export interface ChatStreamError {
+  code: string;
+  message: string;
+}
+
+export interface ChatStreamHandlers {
+  onMeta?: (meta: ChatStreamMeta) => void;
+  onToken?: (delta: string) => void;
+  onDone?: (response: ChatResponse) => void;
+  onError?: (error: ChatStreamError) => void;
+}

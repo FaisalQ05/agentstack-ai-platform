@@ -1,25 +1,24 @@
 'use client';
 
 import { Button } from '@/components/ui/button';
-import { AppNav } from '@/components/layout/AppNav';
+import { AppShell } from '@/components/layout/AppShell';
+import { inputClassName, panelClassName } from '@/lib/ui-classes';
 import { cn } from '@/lib/utils';
-import { Loader2, MessageSquarePlus, Send } from 'lucide-react';
+import { getApiErrorMessage } from '@/shared/utils/get-api-error-message';
+import { Loader2, MessageSquarePlus, Send, Sparkles } from 'lucide-react';
 import { FormEvent, useEffect, useRef, useState } from 'react';
 import {
   fetchConversation,
   fetchConversations,
-  sendChatMessage,
+  streamChatMessage,
 } from '../api/chat.api';
 import { ChatMessage, ConversationSummary } from '../types/chat.types';
-import { getApiErrorMessage } from '@/shared/utils/get-api-error-message';
 
-interface ChatPageProps {
-  initialConversations?: ConversationSummary[];
-}
+const STREAMING_ID = 'streaming-assistant';
 
-export function ChatPage({ initialConversations = [] }: ChatPageProps) {
+export function ChatPage() {
   const [conversations, setConversations] =
-    useState<ConversationSummary[]>(initialConversations);
+    useState<ConversationSummary[]>([]);
   const [activeConversationId, setActiveConversationId] = useState<
     string | null
   >(null);
@@ -53,9 +52,7 @@ export function ChatPage({ initialConversations = [] }: ChatPageProps) {
         }
       } catch (err) {
         if (!cancelled) {
-          setError(
-            getApiErrorMessage(err, 'Failed to load conversations'),
-          );
+          setError(getApiErrorMessage(err, 'Failed to load conversations'));
         }
       } finally {
         if (!cancelled) {
@@ -96,6 +93,38 @@ export function ChatPage({ initialConversations = [] }: ChatPageProps) {
     setError(null);
   }
 
+  function appendStreamingToken(delta: string) {
+    setMessages((current) => {
+      const existing = current.find((m) => m.id === STREAMING_ID);
+
+      if (existing) {
+        return current.map((m) =>
+          m.id === STREAMING_ID ? { ...m, content: m.content + delta } : m,
+        );
+      }
+
+      return [
+        ...current,
+        {
+          id: STREAMING_ID,
+          role: 'assistant',
+          content: delta,
+          createdAt: new Date().toISOString(),
+        },
+      ];
+    });
+  }
+
+  function finalizeStreamingMessage(message: ChatMessage) {
+    setMessages((current) =>
+      current.map((m) => (m.id === STREAMING_ID ? message : m)),
+    );
+  }
+
+  function removeStreamingPlaceholder() {
+    setMessages((current) => current.filter((m) => m.id !== STREAMING_ID));
+  }
+
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
@@ -115,19 +144,41 @@ export function ChatPage({ initialConversations = [] }: ChatPageProps) {
     setMessages((current) => [...current, optimisticMessage]);
 
     try {
-      const response = await sendChatMessage({
-        message: trimmed,
-        conversationId: activeConversationId ?? undefined,
-        system: systemPrompt.trim() || undefined,
-      });
+      let streamFailed: Error | null = null;
 
-      setActiveConversationId(response.conversationId);
-      setActiveMeta({ provider: response.provider, model: response.model });
-      setMessages((current) => [...current, response.message]);
+      await streamChatMessage(
+        {
+          message: trimmed,
+          conversationId: activeConversationId ?? undefined,
+          system: systemPrompt.trim() || undefined,
+        },
+        {
+          onMeta: (meta) => {
+            setActiveConversationId(meta.conversationId);
+            setActiveMeta({ provider: meta.provider, model: meta.model });
+          },
+          onToken: appendStreamingToken,
+          onDone: async (response) => {
+            finalizeStreamingMessage(response.message);
+            setActiveConversationId(response.conversationId);
+            setActiveMeta({
+              provider: response.provider,
+              model: response.model,
+            });
+            const refreshed = await fetchConversations();
+            setConversations(refreshed);
+          },
+          onError: (streamError) => {
+            streamFailed = new Error(streamError.message);
+          },
+        },
+      );
 
-      const refreshed = await fetchConversations();
-      setConversations(refreshed);
+      if (streamFailed) {
+        throw streamFailed;
+      }
     } catch (err) {
+      removeStreamingPlaceholder();
       setMessages((current) =>
         current.filter((message) => message.id !== optimisticMessage.id),
       );
@@ -138,158 +189,185 @@ export function ChatPage({ initialConversations = [] }: ChatPageProps) {
   }
 
   return (
-    <div className="mx-auto flex h-[calc(100vh-2rem)] max-w-6xl flex-col gap-3 p-4">
-      <AppNav />
-      <div className="flex min-h-0 flex-1 gap-4">
-      <aside className="hidden w-72 shrink-0 flex-col rounded-2xl border border-border bg-card/80 p-4 shadow-sm md:flex">
-        <div className="mb-4 flex items-center justify-between">
-          <h1 className="text-lg font-semibold">AI Chat</h1>
-          <Button
-            type="button"
-            size="icon-sm"
-            variant="outline"
-            onClick={startNewConversation}
-            aria-label="New conversation"
-          >
-            <MessageSquarePlus />
-          </Button>
-        </div>
-
-        <div className="flex-1 space-y-2 overflow-y-auto">
-          {conversations.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No conversations yet.</p>
-          ) : (
-            conversations.map((conversation) => (
-              <button
-                key={conversation.id}
-                type="button"
-                onClick={() => void loadConversation(conversation.id)}
-                className={cn(
-                  'w-full rounded-xl border px-3 py-2 text-left text-sm transition-colors',
-                  activeConversationId === conversation.id
-                    ? 'border-primary bg-primary/5'
-                    : 'border-transparent hover:bg-muted',
-                )}
-              >
-                <p className="truncate font-medium">
-                  {conversation.title ?? 'Untitled chat'}
-                </p>
-                <p className="truncate text-xs text-muted-foreground">
-                  {new Date(conversation.updatedAt).toLocaleString()}
-                </p>
-              </button>
-            ))
+    <AppShell
+      title="AI Chat"
+      description="Streaming responses via Server-Sent Events (SSE)"
+    >
+      <div className="flex h-[calc(100vh-8.5rem)] min-h-[480px] gap-4">
+        <aside
+          className={cn(
+            panelClassName,
+            'hidden w-72 shrink-0 flex-col p-4 md:flex',
           )}
-        </div>
-      </aside>
-
-      <section className="flex min-w-0 flex-1 flex-col rounded-2xl border border-border bg-card/80 shadow-sm">
-        <header className="border-b border-border p-4">
-          <div className="mb-3 flex items-center justify-between gap-3">
-            <div>
-              <h2 className="text-base font-semibold">Conversation</h2>
-              {activeMeta ? (
-                <p className="text-xs text-muted-foreground">
-                  {activeMeta.provider} · {activeMeta.model}
-                </p>
-              ) : null}
-            </div>
+        >
+          <div className="mb-4 flex items-center justify-between">
+            <h2 className="text-sm font-semibold text-foreground">
+              Conversations
+            </h2>
             <Button
               type="button"
-              size="sm"
+              size="icon-sm"
               variant="outline"
-              className="md:hidden"
               onClick={startNewConversation}
+              aria-label="New conversation"
             >
               <MessageSquarePlus />
-              New
             </Button>
           </div>
 
-          <label className="block text-xs font-medium text-muted-foreground">
-            System prompt
-            <textarea
-              value={systemPrompt}
-              onChange={(event) => setSystemPrompt(event.target.value)}
-              rows={2}
-              className="mt-1 w-full resize-none rounded-xl border border-input bg-background px-3 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
-              placeholder="Define how the assistant should behave..."
-            />
-          </label>
-        </header>
+          <div className="flex-1 space-y-2 overflow-y-auto">
+            {conversations.length === 0 ? (
+              <p className="text-sm text-muted-foreground">
+                No conversations yet.
+              </p>
+            ) : (
+              conversations.map((conversation) => (
+                <button
+                  key={conversation.id}
+                  type="button"
+                  onClick={() => void loadConversation(conversation.id)}
+                  className={cn(
+                    'w-full rounded-xl border px-3 py-2 text-left text-sm transition-colors',
+                    activeConversationId === conversation.id
+                      ? 'border-primary bg-primary/10 text-foreground'
+                      : 'border-transparent text-foreground hover:bg-muted',
+                  )}
+                >
+                  <p className="truncate font-medium">
+                    {conversation.title ?? 'Untitled chat'}
+                  </p>
+                  <p className="truncate text-xs text-muted-foreground">
+                    {new Date(conversation.updatedAt).toLocaleString()}
+                  </p>
+                </button>
+              ))
+            )}
+          </div>
+        </aside>
 
-        <div className="flex-1 space-y-4 overflow-y-auto p-4">
-          {isBootstrapping ? (
-            <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
-              <Loader2 className="mr-2 size-4 animate-spin" />
-              Loading conversations...
-            </div>
-          ) : messages.length === 0 ? (
-            <div className="flex h-full flex-col items-center justify-center text-center text-muted-foreground">
-              <MessageSquarePlus className="mb-3 size-8 opacity-60" />
-              <p className="text-sm">Start a conversation with your AI assistant.</p>
-            </div>
-          ) : (
-            messages.map((message) => (
-              <article
-                key={message.id}
-                className={cn(
-                  'max-w-[85%] rounded-2xl px-4 py-3 text-sm leading-relaxed',
-                  message.role === 'user'
-                    ? 'ml-auto bg-primary text-primary-foreground'
-                    : 'bg-muted text-foreground',
+        <section className={cn(panelClassName, 'flex min-w-0 flex-1 flex-col')}>
+          <header className="border-b border-border p-4">
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <div>
+                <div className="flex items-center gap-2">
+                  <Sparkles className="size-4 text-primary" />
+                  <h2 className="text-base font-semibold text-foreground">
+                    Conversation
+                  </h2>
+                </div>
+                {activeMeta ? (
+                  <p className="text-xs text-muted-foreground">
+                    {activeMeta.provider} · {activeMeta.model} · SSE stream
+                  </p>
+                ) : (
+                  <p className="text-xs text-muted-foreground">
+                    Tokens stream in real time
+                  </p>
                 )}
+              </div>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="md:hidden"
+                onClick={startNewConversation}
               >
-                <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide opacity-70">
-                  {message.role}
-                </p>
-                <p className="whitespace-pre-wrap">{message.content}</p>
-              </article>
-            ))
-          )}
-
-          {isLoading ? (
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <Loader2 className="size-4 animate-spin" />
-              Thinking...
+                <MessageSquarePlus />
+                New
+              </Button>
             </div>
-          ) : null}
 
-          {error ? (
-            <p className="rounded-xl border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
-              {error}
-            </p>
-          ) : null}
+            <label className="block text-xs font-medium text-muted-foreground">
+              System prompt
+              <textarea
+                value={systemPrompt}
+                onChange={(event) => setSystemPrompt(event.target.value)}
+                rows={2}
+                className={cn(inputClassName, 'mt-1 resize-none')}
+                placeholder="Define how the assistant should behave..."
+              />
+            </label>
+          </header>
 
-          <div ref={messagesEndRef} />
-        </div>
+          <div className="flex-1 space-y-4 overflow-y-auto p-4">
+            {isBootstrapping ? (
+              <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
+                <Loader2 className="mr-2 size-4 animate-spin" />
+                Loading conversations...
+              </div>
+            ) : messages.length === 0 ? (
+              <div className="flex h-full flex-col items-center justify-center text-center text-muted-foreground">
+                <MessageSquarePlus className="mb-3 size-8 opacity-60" />
+                <p className="text-sm text-foreground">
+                  Start a conversation with your AI assistant.
+                </p>
+                <p className="mt-1 text-xs">
+                  Responses stream token-by-token over SSE.
+                </p>
+              </div>
+            ) : (
+              messages.map((message) => (
+                <article
+                  key={message.id}
+                  className={cn(
+                    'max-w-[85%] rounded-2xl px-4 py-3 text-sm leading-relaxed',
+                    message.role === 'user'
+                      ? 'ml-auto bg-primary text-primary-foreground'
+                      : 'border border-border bg-muted text-foreground',
+                    message.id === STREAMING_ID && isLoading && 'animate-pulse',
+                  )}
+                >
+                  <p
+                    className={cn(
+                      'mb-1 text-[11px] font-semibold uppercase tracking-wide',
+                      message.role === 'user'
+                        ? 'text-primary-foreground/80'
+                        : 'text-muted-foreground',
+                    )}
+                  >
+                    {message.role}
+                    {message.id === STREAMING_ID && isLoading ? ' · streaming' : ''}
+                  </p>
+                  <p className="whitespace-pre-wrap">{message.content}</p>
+                </article>
+              ))
+            )}
 
-        <form
-          onSubmit={(event) => void handleSubmit(event)}
-          className="border-t border-border p-4"
-        >
-          <div className="flex items-end gap-2">
-            <textarea
-              value={input}
-              onChange={(event) => setInput(event.target.value)}
-              rows={2}
-              placeholder="Ask anything..."
-              className="min-h-12 flex-1 resize-none rounded-xl border border-input bg-background px-3 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
-              onKeyDown={(event) => {
-                if (event.key === 'Enter' && !event.shiftKey) {
-                  event.preventDefault();
-                  event.currentTarget.form?.requestSubmit();
-                }
-              }}
-            />
-            <Button type="submit" disabled={isLoading || !input.trim()}>
-              {isLoading ? <Loader2 className="animate-spin" /> : <Send />}
-              Send
-            </Button>
+            {error ? (
+              <p className="rounded-xl border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+                {error}
+              </p>
+            ) : null}
+
+            <div ref={messagesEndRef} />
           </div>
-        </form>
-      </section>
+
+          <form
+            onSubmit={(event) => void handleSubmit(event)}
+            className="border-t border-border p-4"
+          >
+            <div className="flex items-end gap-2">
+              <textarea
+                value={input}
+                onChange={(event) => setInput(event.target.value)}
+                rows={2}
+                placeholder="Ask anything..."
+                className={cn(inputClassName, 'min-h-12 flex-1 resize-none')}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter' && !event.shiftKey) {
+                    event.preventDefault();
+                    event.currentTarget.form?.requestSubmit();
+                  }
+                }}
+              />
+              <Button type="submit" disabled={isLoading || !input.trim()}>
+                {isLoading ? <Loader2 className="animate-spin" /> : <Send />}
+                Send
+              </Button>
+            </div>
+          </form>
+        </section>
       </div>
-    </div>
+    </AppShell>
   );
 }

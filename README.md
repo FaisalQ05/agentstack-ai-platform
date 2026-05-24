@@ -4,7 +4,7 @@ Full-stack MERN-style starter for learning AI integration: **NestJS** backend, *
 
 ## Features
 
-- **AI Chat API** — `POST /api/v1/chat` with system prompt injection
+- **AI Chat API** — `POST /api/v1/chat` with system prompt injection and **SSE streaming** at `POST /api/v1/chat/stream`
 - **Content tools** — `/summarize`, `/rewrite`, `/extract-keywords`, `/generate-description`
 - **Conversation memory** — messages stored in PostgreSQL via Prisma
 - **Swappable AI providers** — change `AI_PROVIDER` in env (OpenAI ↔ Groq)
@@ -110,7 +110,7 @@ pnpm dev
 
 ### `POST /api/v1/chat`
 
-Send a message and get an AI reply. Creates a new conversation if `conversationId` is omitted.
+Send a message and get an AI reply (non-streaming). Creates a new conversation if `conversationId` is omitted.
 
 ```json
 {
@@ -118,6 +118,23 @@ Send a message and get an AI reply. Creates a new conversation if `conversationI
   "conversationId": "optional-uuid",
   "system": "You are a helpful MERN mentor."
 }
+```
+
+### `POST /api/v1/chat/stream` (SSE)
+
+Same body as `/chat`. Streams tokens as Server-Sent Events:
+
+| Event | Payload |
+| ----- | ------- |
+| `meta` | `{ conversationId, provider, model }` |
+| `token` | `{ delta: "..." }` |
+| `done` | Full `ChatResponse` with saved message |
+| `error` | `{ code, message }` |
+
+```bash
+curl -N -X POST http://localhost:4000/api/v1/chat/stream \
+  -H "Content-Type: application/json" \
+  -d '{"message":"Hello"}'
 ```
 
 ### `GET /api/v1/chat`

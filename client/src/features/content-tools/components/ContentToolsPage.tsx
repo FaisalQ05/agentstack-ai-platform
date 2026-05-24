@@ -1,7 +1,8 @@
 'use client';
 
 import { Button } from '@/components/ui/button';
-import { AppNav } from '@/components/layout/AppNav';
+import { AppShell } from '@/components/layout/AppShell';
+import { inputClassName, panelClassName } from '@/lib/ui-classes';
 import { cn } from '@/lib/utils';
 import { getApiErrorMessage } from '@/shared/utils/get-api-error-message';
 import { Loader2, Sparkles } from 'lucide-react';
@@ -45,9 +46,6 @@ const TOOLS: { id: ToolId; label: string; description: string }[] = [
     description: 'Generate product or article copy',
   },
 ];
-
-const inputClassName =
-  'w-full rounded-xl border border-input bg-background px-3 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50';
 
 export function ContentToolsPage() {
   const [activeTool, setActiveTool] = useState<ToolId>('summarize');
@@ -167,19 +165,10 @@ export function ContentToolsPage() {
   const activeMeta = TOOLS.find((tool) => tool.id === activeTool);
 
   return (
-    <div className="mx-auto flex min-h-[calc(100vh-2rem)] max-w-5xl flex-col gap-6 p-4 md:p-6">
-      <AppNav />
-      <header>
-        <div className="mb-1 flex items-center gap-2">
-          <Sparkles className="size-6" />
-          <h1 className="text-2xl font-semibold tracking-tight">Content Tools</h1>
-        </div>
-        <p className="text-sm text-muted-foreground">
-          Stateless AI micro-endpoints — summarize, rewrite, extract keywords, and
-          generate descriptions.
-        </p>
-      </header>
-
+    <AppShell
+      title="Content Tools"
+      description="Summarize, rewrite, extract keywords, and generate descriptions"
+    >
       <div className="flex flex-wrap gap-2">
         {TOOLS.map((tool) => (
           <button
@@ -189,8 +178,8 @@ export function ContentToolsPage() {
             className={cn(
               'rounded-xl border px-4 py-2 text-left text-sm transition-colors',
               activeTool === tool.id
-                ? 'border-primary bg-primary/5 font-medium'
-                : 'border-border hover:bg-muted',
+                ? 'border-primary bg-primary/10 font-medium text-foreground'
+                : 'border-border text-muted-foreground hover:bg-muted hover:text-foreground',
             )}
           >
             {tool.label}
@@ -198,10 +187,10 @@ export function ContentToolsPage() {
         ))}
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-2">
+      <div className="mt-4 grid gap-6 lg:grid-cols-2">
         <form
           onSubmit={(event) => void handleSubmit(event)}
-          className="flex flex-col gap-4 rounded-2xl border border-border bg-card/80 p-5 shadow-sm"
+          className={cn(panelClassName, 'flex flex-col gap-4 p-5')}
         >
           <div>
             <h2 className="font-semibold">{activeMeta?.label}</h2>
@@ -396,10 +385,15 @@ export function ContentToolsPage() {
         </form>
 
         <div className="flex min-h-[320px] flex-col gap-4">
-          <h3 className="text-sm font-semibold text-muted-foreground">Output</h3>
+          <h3 className="text-sm font-semibold text-foreground">Output</h3>
 
           {!summary && !rewritten && !keywords && !description && !isLoading ? (
-            <div className="flex flex-1 items-center justify-center rounded-2xl border border-dashed border-border p-8 text-center text-sm text-muted-foreground">
+            <div
+              className={cn(
+                panelClassName,
+                'flex flex-1 items-center justify-center p-8 text-center text-sm text-muted-foreground',
+              )}
+            >
               Run a tool to see results here.
             </div>
           ) : null}
@@ -425,6 +419,6 @@ export function ContentToolsPage() {
           ) : null}
         </div>
       </div>
-    </div>
+    </AppShell>
   );
 }

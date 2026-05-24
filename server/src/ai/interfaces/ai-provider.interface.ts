@@ -17,6 +17,7 @@ export interface AiCompletionResult {
 export interface AiProvider {
   readonly name: string;
   complete(options: AiCompletionOptions): Promise<AiCompletionResult>;
+  streamComplete(options: AiCompletionOptions): AsyncGenerator<string>;
 }
 
 export const AI_PROVIDER = Symbol('AI_PROVIDER');

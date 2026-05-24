@@ -20,4 +20,10 @@ export class AiService {
   complete(options: AiCompletionOptions): Promise<AiCompletionResult> {
     return this.provider.complete(options);
   }
+
+  streamComplete(
+    options: AiCompletionOptions,
+  ): AsyncGenerator<string> {
+    return this.provider.streamComplete(options);
+  }
 }

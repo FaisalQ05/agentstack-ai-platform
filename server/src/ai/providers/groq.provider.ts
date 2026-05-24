@@ -14,23 +14,14 @@ export class GroqProvider implements AiProvider {
   ) {}
 
   async complete(options: AiCompletionOptions): Promise<AiCompletionResult> {
-    console.log('IN GROQ PROVIDER');
-
     const model = options.model ?? this.defaultModel;
-
-    console.log({ model });
-    console.log({ messages: options.messages });
 
     const response = await this.client.chat.completions.create({
       model,
       messages: options.messages,
     });
 
-    console.log({ response });
-
     const content = response.choices[0]?.message?.content?.trim();
-
-    console.log({ content });
 
     if (!content) {
       throw new Error('Groq returned an empty response');
@@ -41,5 +32,24 @@ export class GroqProvider implements AiProvider {
       model,
       provider: this.name,
     };
+  }
+
+  async *streamComplete(
+    options: AiCompletionOptions,
+  ): AsyncGenerator<string> {
+    const model = options.model ?? this.defaultModel;
+
+    const stream = await this.client.chat.completions.create({
+      model,
+      messages: options.messages,
+      stream: true,
+    });
+
+    for await (const chunk of stream) {
+      const delta = chunk.choices[0]?.delta?.content;
+      if (delta) {
+        yield delta;
+      }
+    }
   }
 }

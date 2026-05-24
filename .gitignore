@@ -1,0 +1,136 @@
+# =============================================================
+# AI Integration — .gitignore
+# =============================================================
+
+# -------------------------------------------------------------
+# Dependencies
+# -------------------------------------------------------------
+node_modules/
+.pnp
+.pnp.js
+.pnp.cache
+.pnpm-store/
+.yarn/cache
+.yarn/unplugged
+.yarn/build-state.yml
+.yarn/install-state.gz
+.yarn/versions/
+.yarn
+
+# -------------------------------------------------------------
+# Build outputs
+# -------------------------------------------------------------
+dist/
+build/
+out/
+.next/
+.nuxt/
+.cache/
+.turbo/
+*.tsbuildinfo
+
+# NestJS
+server/dist/
+
+# Next.js
+client/build/
+
+# Prisma generated client (regenerated via `pnpm prisma:generate`)
+server/generated/
+
+# -------------------------------------------------------------
+# Environment & secrets — never commit these
+# -------------------------------------------------------------
+.env
+.env.*
+!.env.example
+!.env.*.example
+.env.local
+.env.*.local
+
+server/.env
+server/.env.*
+!server/.env.example
+
+client/.env
+client/.env.*
+!client/.env.example
+
+# -------------------------------------------------------------
+# Logs
+# -------------------------------------------------------------
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# -------------------------------------------------------------
+# Docker volumes / persistent data
+# -------------------------------------------------------------
+postgres/
+postgres/data/
+redis/data/
+mongo/data/
+mongo/keyfile/
+certbot/
+
+# -------------------------------------------------------------
+# TypeScript
+# -------------------------------------------------------------
+*.js.map
+*.d.ts.map
+
+# -------------------------------------------------------------
+# Testing & coverage
+# -------------------------------------------------------------
+coverage/
+.nyc_output/
+*.lcov
+jest.config.local.*
+
+# -------------------------------------------------------------
+# Personal / local
+# -------------------------------------------------------------
+.obsidian/
+
+# -------------------------------------------------------------
+# OS artefacts
+# -------------------------------------------------------------
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+.Spotlight-V100
+.Trashes
+.fseventsd
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+*~
+
+# -------------------------------------------------------------
+# Editors & IDEs
+# -------------------------------------------------------------
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
+!.vscode/launch.json
+.idea/
+*.iml
+*.iws
+*.swp
+*.swo
+*.bak
+*#
+
+# -------------------------------------------------------------
+# Certificates & keys
+# -------------------------------------------------------------
+*.pem
+*.p12
+*.key
+*.cert
+*.crt

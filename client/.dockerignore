@@ -1,0 +1,27 @@
+node_modules
+.pnpm-store
+
+# Next.js build cache
+.next
+out
+.turbo
+
+# Env & secrets
+.env
+.env.*
+!.env.example
+
+# Git / editor
+.git
+.gitignore
+.dockerignore
+.vscode
+.idea
+*.md
+
+# Tests & coverage
+coverage
+.nyc_output
+
+# OS
+.DS_Store

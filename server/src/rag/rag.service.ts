@@ -39,9 +39,17 @@ export class RagService implements OnModuleInit {
   private assertEmbeddingConfigured(): void {
     const { provider, embeddingProvider, embeddingApiKey } = this.config.ai;
 
-    if (provider === 'groq' && embeddingProvider === 'openai' && !embeddingApiKey) {
+    if (embeddingProvider === 'local') {
+      return;
+    }
+
+    if (
+      provider === 'groq' &&
+      embeddingProvider === 'openai' &&
+      !embeddingApiKey
+    ) {
       throw new Error(
-        'AI_EMBEDDING_API_KEY is required when AI_PROVIDER=groq. Groq does not host embedding models — set an OpenAI API key for RAG indexing.',
+        'AI_EMBEDDING_API_KEY is required when AI_EMBEDDING_PROVIDER=openai and AI_PROVIDER=groq.',
       );
     }
   }
@@ -76,11 +84,9 @@ export class RagService implements OnModuleInit {
       chunkIndex: index,
     }));
 
-    const embedResult = await this.aiService.embedWithFallback({
-      input: chunkRecords.map((c) => c.content),
-      model: this.config.ai.embeddingModel,
-      dimensions: this.config.ai.embeddingDimensions,
-    });
+    const embedResult = await this.embeddingService.embedTextsWithMeta(
+      chunkRecords.map((c) => c.content),
+    );
 
     if (embedResult.embeddings.length !== chunkRecords.length) {
       await this.prisma.ragDocument.delete({ where: { id: document.id } });

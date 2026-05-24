@@ -1,27 +1,32 @@
+# Dependencies & caches
 node_modules
 .pnpm-store
-
-# Next.js build cache
 .next
 out
 .turbo
+dist
+build
 
 # Env & secrets
 .env
 .env.*
 !.env.example
 
-# Git / editor
+# VCS & editor
 .git
 .gitignore
 .dockerignore
 .vscode
 .idea
+
+# Docs (not needed in dev image build context)
+README.md
 *.md
 
 # Tests & coverage
 coverage
 .nyc_output
 
-# OS
+# OS & logs
 .DS_Store
+*.log

@@ -1,11 +1,8 @@
+# Dependencies & build output
 node_modules
 .pnpm-store
-
-# Nest / TS build output
 dist
 *.tsbuildinfo
-
-# Prisma (regenerated in container if needed; host copy not required for dev)
 generated
 
 # Env & secrets
@@ -13,17 +10,22 @@ generated
 .env.*
 !.env.example
 
-# Git / editor
+# VCS & editor
 .git
 .gitignore
 .dockerignore
 .vscode
 .idea
+
+# Docs (not needed in dev image build context)
+README.md
 *.md
 
 # Tests & coverage
 coverage
 .nyc_output
+test
 
-# OS
+# OS & logs
 .DS_Store
+*.log

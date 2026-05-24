@@ -45,9 +45,7 @@ export class VectorSearchService {
     }
   }
 
-  async searchSimilar(
-    options: VectorSearchOptions,
-  ): Promise<RetrievedChunk[]> {
+  async searchSimilar(options: VectorSearchOptions): Promise<RetrievedChunk[]> {
     const { embedding, topK, documentId } = options;
     const vector = toPgVectorLiteral(embedding);
 

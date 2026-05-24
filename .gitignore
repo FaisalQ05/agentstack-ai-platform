@@ -1,64 +1,54 @@
-# =============================================================
-# AI Integration — .gitignore
-# =============================================================
-
-# -------------------------------------------------------------
-# Dependencies
-# -------------------------------------------------------------
+# Dependencies — Node
 node_modules/
+.pnpm-store/
 .pnp
 .pnp.js
 .pnp.cache
-.pnpm-store/
-.yarn/cache
-.yarn/unplugged
-.yarn/build-state.yml
-.yarn/install-state.gz
-.yarn/versions/
-.yarn
 
-# -------------------------------------------------------------
-# Build outputs
-# -------------------------------------------------------------
+# Dependencies — Python (embeddings service)
+embeddings/venv/
+embeddings/.venv/
+venv/
+.venv/
+*.egg-info/
+.eggs/
+pip-wheel-metadata/
+__pycache__/
+**/__pycache__/
+*.py[cod]
+*$py.class
+.Python
+
+# ML model caches (FastEmbed / HuggingFace — do not commit weights)
+embeddings/.cache/
+.fastembed/
+.huggingface/
+**/.cache/huggingface/
+
+# Build outputs — Node
 dist/
 build/
 out/
 .next/
-.nuxt/
-.cache/
 .turbo/
 *.tsbuildinfo
-
-# NestJS
 server/dist/
-
-# Next.js
 client/build/
-
-# Prisma generated client (regenerated via `pnpm prisma:generate`)
 server/generated/
 
-# -------------------------------------------------------------
-# Environment & secrets — never commit these
-# -------------------------------------------------------------
+# Environment & secrets
 .env
 .env.*
 !.env.example
 !.env.*.example
-.env.local
-.env.*.local
-
 server/.env
 server/.env.*
 !server/.env.example
-
 client/.env
 client/.env.*
 !client/.env.example
 
-# -------------------------------------------------------------
 # Logs
-# -------------------------------------------------------------
 logs/
 *.log
 npm-debug.log*
@@ -66,9 +56,7 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 
-# -------------------------------------------------------------
-# Docker volumes / persistent data
-# -------------------------------------------------------------
+# Docker / persistent local data
 postgres/
 postgres/data/
 redis/data/
@@ -76,61 +64,43 @@ mongo/data/
 mongo/keyfile/
 certbot/
 
-# -------------------------------------------------------------
-# TypeScript
-# -------------------------------------------------------------
-*.js.map
-*.d.ts.map
-
-# -------------------------------------------------------------
 # Testing & coverage
-# -------------------------------------------------------------
 coverage/
 .nyc_output/
 *.lcov
 jest.config.local.*
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
 
-# -------------------------------------------------------------
-# Personal / local
-# -------------------------------------------------------------
-.obsidian/
-
-# -------------------------------------------------------------
-# OS artefacts
-# -------------------------------------------------------------
+# OS
 .DS_Store
 .AppleDouble
 .LSOverride
 ._*
-.Spotlight-V100
-.Trashes
-.fseventsd
 Thumbs.db
 ehthumbs.db
 Desktop.ini
 $RECYCLE.BIN/
 *~
 
-# -------------------------------------------------------------
 # Editors & IDEs
-# -------------------------------------------------------------
 .vscode/*
 !.vscode/settings.json
 !.vscode/extensions.json
 !.vscode/launch.json
 .idea/
 *.iml
-*.iws
 *.swp
 *.swo
 *.bak
-*#
 
-# -------------------------------------------------------------
 # Certificates & keys
-# -------------------------------------------------------------
 *.pem
 *.p12
 *.key
 *.cert
 *.crt
+
+# Misc local
+.obsidian/

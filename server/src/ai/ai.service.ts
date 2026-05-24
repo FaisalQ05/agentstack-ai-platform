@@ -1,5 +1,6 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { TypedConfigService } from '../config/typed-config.service';
+import { EmbeddingGeneratorService } from './embedding-generator.service';
 import {
   AI_FALLBACK_PROVIDER,
   AI_PROVIDER,
@@ -22,6 +23,7 @@ export class AiService {
     @Inject(AI_FALLBACK_PROVIDER)
     private readonly fallbackProvider: AiProvider | null,
     private readonly config: TypedConfigService,
+    private readonly embeddingGenerator: EmbeddingGeneratorService,
   ) {}
 
   get activeProvider(): string {
@@ -62,6 +64,15 @@ export class AiService {
 
   embed(options: AiEmbeddingOptions): Promise<AiEmbeddingResult> {
     return this.provider.embed(this.primaryEmbedOptions(options));
+  }
+
+  /** RAG embeddings: local → OpenAI → Groq (provider-agnostic for callers). */
+  generateEmbedding(text: string): Promise<AiEmbeddingResult> {
+    return this.embeddingGenerator.generateEmbedding(text);
+  }
+
+  generateEmbeddings(texts: string[]): Promise<AiEmbeddingResult> {
+    return this.embeddingGenerator.generateEmbeddings(texts);
   }
 
   async embedWithFallback(

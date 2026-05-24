@@ -1,270 +1,232 @@
 # AI Integration
 
-Full-stack MERN-style starter for learning AI integration: **NestJS** backend, **Next.js** frontend, **PostgreSQL** persistence, and a **provider-agnostic** AI layer (OpenAI or Groq).
+Full-stack starter for AI integration: **NestJS** API, **Next.js** UI, **PostgreSQL** + **pgvector** RAG, swappable chat providers (OpenAI / Groq), and a **lightweight local embedding** service (FastEmbed / ONNX — no PyTorch).
 
 ## Features
 
-- **AI Chat API** — `POST /api/v1/chat` with system prompt injection and **SSE streaming** at `POST /api/v1/chat/stream`
-- **Content tools** — `/summarize`, `/rewrite`, `/extract-keywords`, `/generate-description`
-- **Conversation memory** — messages stored in PostgreSQL via Prisma
-- **Swappable AI providers** — change `AI_PROVIDER` in env (OpenAI ↔ Groq)
-- **Chat UI** — Next.js app at `/chat` with conversation sidebar
+| Area | Description |
+| ---- | ----------- |
+| **AI Chat** | `POST /api/v1/chat`, SSE at `/chat/stream`, PostgreSQL memory |
+| **Content tools** | Summarize, rewrite, keywords, generate-description |
+| **Structured AI tools** | CV parser, job extractor, job matcher (Zod + JSON schema) |
+| **RAG** | Chunk → embed → pgvector → grounded answers |
+| **Embeddings** | Local FastEmbed ONNX (`all-MiniLM-L6-v2`, 384d), fallback OpenAI → Groq |
 
 ## Tech stack
 
-| Layer    | Stack                                      |
-| -------- | ------------------------------------------ |
-| Backend  | NestJS, Prisma, PostgreSQL, OpenAI SDK     |
+| Layer | Stack |
+| ----- | ----- |
+| Backend | NestJS, Prisma, PostgreSQL, pgvector |
 | Frontend | Next.js 16, React 19, TanStack Query, Tailwind |
-| DevOps   | Docker Compose, pnpm                       |
+| Embeddings | FastAPI, [FastEmbed](https://github.com/qdrant/fastembed), ONNX Runtime |
+| DevOps | Docker Compose, pnpm |
 
 ## Project structure
 
 ```
 ai-integration/
-├── client/          # Next.js frontend
-├── server/          # NestJS API
-├── postgres/        # Local Postgres data (gitignored)
+├── client/                 # Next.js — /, /chat, /tools, /ai-tools, /rag
+├── server/                 # NestJS API (api/v1)
+├── embeddings/             # Local ONNX embedding service (:8000)
+├── postgres/               # Dev Postgres data (gitignored)
 └── docker-compose.dev.yml
 ```
 
+Docker builds use **per-service** `.dockerignore` files (`client/`, `server/`, `embeddings/`). There is no repo-root `.dockerignore`.
+
 ## Quick start (Docker)
 
-**1. Clone and configure env**
+**1. Env**
 
 ```bash
 cp server/.env.example server/.env
 cp client/.env.example client/.env
 ```
 
-Edit `server/.env` and set `AI_API_KEY`.
+Set `AI_API_KEY` in `server/.env`. For cloud embedding fallback when local service is down, set `AI_EMBEDDING_API_KEY`.
 
-**2. Start all services**
+**2. Start stack**
 
 ```bash
 docker compose -f docker-compose.dev.yml up --build -d
 ```
 
-**3. Run database migrations**
+Services: **postgres** (pgvector), **embeddings** (ONNX), **server**, **client**.
+
+**3. Migrations**
 
 ```bash
 docker compose -f docker-compose.dev.yml exec server pnpm prisma migrate deploy
 ```
 
-**4. Open the app**
+**4. URLs**
 
-- Frontend: http://localhost:3000
-- Chat UI: http://localhost:3000/chat
-- API: http://localhost:4000/api/v1
+| URL | Description |
+| --- | ------------- |
+| http://localhost:3000 | Frontend home |
+| http://localhost:3000/chat | Chat |
+| http://localhost:3000/rag | RAG knowledge base |
+| http://localhost:3000/ai-tools | Structured tools |
+| http://localhost:4000/api/v1 | REST API |
+| http://localhost:8000/health | Embedding service health |
 
 ## Quick start (local)
 
-**1. Start Postgres**
+**1. Postgres + embeddings**
 
 ```bash
 docker compose -f docker-compose.dev.yml up postgres -d
+
+cd embeddings
+python -m venv venv && source venv/bin/activate   # Windows: venv\Scripts\activate
+pip install -r requirements.txt
+uvicorn main:app --reload --port 8000
 ```
 
-**2. Backend**
+First run downloads the ONNX model (~80MB) into `embeddings/.cache/` (gitignored).
+
+**2. API**
 
 ```bash
-cd server
-cp .env.example .env   # set AI_API_KEY
-pnpm install
-pnpm prisma:generate
-pnpm prisma:migrate
+cd server && cp .env.example .env
+pnpm install && pnpm prisma:generate && pnpm prisma:migrate
 pnpm start:dev
 ```
 
-**3. Frontend**
+**3. UI**
 
 ```bash
-cd client
-cp .env.example .env
-pnpm install
-pnpm dev
+cd client && cp .env.example .env
+pnpm install && pnpm dev
 ```
 
 ## Environment variables
 
 ### Server (`server/.env`)
 
-| Variable        | Description                          | Default                    |
-| --------------- | ------------------------------------ | -------------------------- |
-| `API_PORT`      | API port                             | `4000`                     |
-| `CLIENT_ORIGIN` | Frontend URL for CORS                | `http://localhost:3000`    |
-| `DATABASE_URL`  | Postgres connection string           | see `.env.example`         |
-| `AI_PROVIDER`   | `openai` or `groq`                   | `openai`                   |
-| `AI_API_KEY`    | Provider API key                     | —                          |
-| `AI_MODEL`      | Model name (optional)                | provider default           |
+| Variable | Description | Default |
+| -------- | ----------- | ------- |
+| `API_PORT` | API port | `4000` |
+| `CLIENT_ORIGIN` | CORS | `http://localhost:3000` |
+| `DATABASE_URL` | Postgres | see `.env.example` |
+| `AI_PROVIDER` | `openai` \| `groq` | `openai` |
+| `AI_API_KEY` | Chat / structured API key | — |
+| `LOCAL_EMBEDDING_URL` | Embedding service | `http://localhost:8000` |
+| `LOCAL_EMBEDDING_TIMEOUT_MS` | HTTP timeout (ms) | `30000` |
+| `LOCAL_EMBEDDING_MAX_RETRIES` | Retry attempts | `3` |
+| `AI_EMBEDDING_DIMENSIONS` | pgvector width | `384` |
+| `AI_EMBEDDING_API_KEY` | OpenAI key (embedding fallback) | — |
 
-> **Docker note:** When the server runs in Docker, `DATABASE_URL` is overridden to `postgres:5432` in `docker-compose.dev.yml`. Keep `localhost` in `.env` for local (non-Docker) development.
+Docker overrides in `docker-compose.dev.yml`: `DATABASE_URL` → `postgres`, `LOCAL_EMBEDDING_URL` → `http://embeddings:8000`.
 
 ### Client (`client/.env`)
 
-| Variable               | Description   | Default                 |
-| ---------------------- | ------------- | ----------------------- |
-| `NEXT_PUBLIC_API_URL`  | Backend URL   | `http://localhost:4000` |
+| Variable | Default |
+| -------- | ------- |
+| `NEXT_PUBLIC_API_URL` | `http://localhost:4000` |
 
-## API
+## Embeddings & RAG
 
-### `POST /api/v1/chat`
+Pipeline: **local ONNX → OpenAI → Groq** via `AiService.generateEmbedding()`.
 
-Send a message and get an AI reply (non-streaming). Creates a new conversation if `conversationId` is omitted.
-
-```json
-{
-  "message": "Explain JWT in simple terms",
-  "conversationId": "optional-uuid",
-  "system": "You are a helpful MERN mentor."
-}
-```
-
-### `POST /api/v1/chat/stream` (SSE)
-
-Same body as `/chat`. Streams tokens as Server-Sent Events:
-
-| Event | Payload |
-| ----- | ------- |
-| `meta` | `{ conversationId, provider, model }` |
-| `token` | `{ delta: "..." }` |
-| `done` | Full `ChatResponse` with saved message |
-| `error` | `{ code, message }` |
+| Endpoint | Purpose |
+| -------- | ------- |
+| `POST /embed` | Single text → `embedding[]` |
+| `POST /embed/batch` | Up to 256 texts (RAG document ingest) |
 
 ```bash
-curl -N -X POST http://localhost:4000/api/v1/chat/stream \
+curl -s http://localhost:8000/health | jq
+curl -s -X POST http://localhost:8000/embed \
   -H "Content-Type: application/json" \
-  -d '{"message":"Hello"}'
+  -d '{"text":"hello world"}' | jq '.dimensions'
 ```
 
-### `GET /api/v1/chat`
+Details: [`embeddings/README.md`](embeddings/README.md).
 
-List all conversations.
+> If you change `AI_EMBEDDING_DIMENSIONS`, run Prisma migrations and **re-index** all RAG documents.
 
-### `GET /api/v1/chat/:conversationId`
+## API overview
 
-Load a conversation with full message history.
+### Chat
 
-## Content tools (micro-endpoints)
+| Method | Path |
+| ------ | ---- |
+| `POST` | `/api/v1/chat` |
+| `POST` | `/api/v1/chat/stream` |
+| `GET` | `/api/v1/chat` |
+| `GET` | `/api/v1/chat/:id` |
 
-Stateless AI utilities — no database, any frontend can call them. All use `POST` with JSON body.
+### Content tools
 
-| Endpoint | Description |
-| -------- | ----------- |
-| `POST /api/v1/summarize` | Shorten text |
-| `POST /api/v1/rewrite` | Rewrite in a given style |
-| `POST /api/v1/extract-keywords` | Return keyword array |
-| `POST /api/v1/generate-description` | Generate marketing copy |
+`POST` `/api/v1/summarize` · `/rewrite` · `/extract-keywords` · `/generate-description`
 
-### `POST /api/v1/summarize`
+### Structured AI tools
 
-```json
-{
-  "content": "Long article text...",
-  "maxLength": 150,
-  "tone": "professional"
-}
-```
+`POST` `/api/v1/ai-tools/cv/parse` · `/jobs/extract` · `/jobs/match`
 
-**Response:** `{ "summary": "...", "provider": "openai", "model": "gpt-4o-mini" }`
+### RAG
 
-### `POST /api/v1/rewrite`
+| Method | Path |
+| ------ | ---- |
+| `POST` | `/api/v1/rag/documents` |
+| `POST` | `/api/v1/rag/ask` |
+| `GET` | `/api/v1/rag/documents` |
 
-```json
-{
-  "content": "Text to improve",
-  "style": "formal",
-  "instructions": "Keep technical terms"
-}
-```
-
-`style`: `formal` | `casual` | `concise` | `friendly` | `professional`
-
-**Response:** `{ "rewritten": "...", "provider": "...", "model": "..." }`
-
-### `POST /api/v1/extract-keywords`
-
-```json
-{
-  "content": "Article or product text...",
-  "count": 10
-}
-```
-
-**Response:** `{ "keywords": ["ai", "nestjs", "..."], "provider": "...", "model": "..." }`
-
-### `POST /api/v1/generate-description`
-
-```json
-{
-  "title": "Wireless Headphones",
-  "content": "Noise cancelling, 40h battery",
-  "type": "product",
-  "maxLength": 300
-}
-```
-
-`type`: `product` | `article` | `service` | `general` — at least one of `title` or `content` required.
-
-**Response:** `{ "description": "...", "provider": "...", "model": "..." }`
-
-### Frontend usage (TypeScript)
-
-```ts
-import { summarize, rewrite, extractKeywords, generateDescription } from '@/features/content-tools/api/content-tools.api';
-
-const { summary } = await summarize({ content: '...' });
-const { keywords } = await extractKeywords({ content: '...', count: 5 });
-```
-
-## Switch AI provider
-
-**OpenAI**
+## Chat provider switch
 
 ```env
+# OpenAI
 AI_PROVIDER=openai
 AI_API_KEY=sk-...
-AI_MODEL=gpt-4o-mini
-```
 
-**Groq**
-
-```env
+# Groq
 AI_PROVIDER=groq
 AI_API_KEY=gsk_...
 AI_MODEL=llama-3.3-70b-versatile
 ```
 
-Restart the server after changing env.
+Restart the server after changes.
 
-## Useful commands
+## Commands
 
 ```bash
-# Server
-cd server
-pnpm start:dev
-pnpm prisma:studio
-pnpm prisma:migrate
+# Embeddings only
+docker compose -f docker-compose.dev.yml up --build embeddings -d
+docker compose -f docker-compose.dev.yml logs -f embeddings
 
-# Client
-cd client
-pnpm dev
-
-# Docker
+# Full stack
 docker compose -f docker-compose.dev.yml up --build -d
-docker compose -f docker-compose.dev.yml logs server -f
-docker compose -f docker-compose.dev.yml down
+docker compose -f docker-compose.dev.yml logs -f server embeddings
+
+# Prisma
+docker compose -f docker-compose.dev.yml exec server pnpm prisma migrate deploy
+cd server && pnpm prisma:studio
 ```
 
 ## Architecture
 
 ```
 Browser (Next.js)
-    ↓ POST /api/v1/chat
-ChatController → ChatService
-    ├── PrismaService (PostgreSQL memory)
-    └── AiService → OpenAiProvider | GroqProvider
+    ↓
+NestJS /api/v1
+    ├── Chat · Content · AI-tools → AiProvider (OpenAI | Groq)
+    └── RAG → EmbeddingGenerator
+              ├── 1. embeddings:8000 (FastEmbed ONNX)
+              ├── 2. OpenAI embeddings (fallback)
+              └── 3. Groq (fallback)
+              → pgvector cosine search → LLM answer
 ```
+
+## Ignore files
+
+| File | Scope |
+| ---- | ----- |
+| [`.gitignore`](.gitignore) | Repo-wide: Node, Python venv, FastEmbed cache, `postgres/data`, secrets |
+| [`client/.dockerignore`](client/.dockerignore) | Client image build context |
+| [`server/.dockerignore`](server/.dockerignore) | Server image build context |
+| [`embeddings/.dockerignore`](embeddings/.dockerignore) | Embeddings image — excludes venv, model cache, docs |
+
+Do not commit: `.env`, `node_modules/`, `embeddings/venv/`, `embeddings/.cache/`, `postgres/data/`.
 
 ## License
 

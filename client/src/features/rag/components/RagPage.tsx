@@ -148,15 +148,16 @@ export function RagPage() {
           <div className="max-w-2xl space-y-2">
             <p className="inline-flex items-center gap-1.5 rounded-full bg-primary/10 px-3 py-1 text-xs font-medium text-primary">
               <Database className="size-3.5" />
-              PostgreSQL + pgvector · Groq chat · OpenAI embeddings
+              PostgreSQL + pgvector · local ONNX embeddings (OpenAI/Groq fallback)
             </p>
             <h2 className="text-2xl font-semibold tracking-tight">
               Retrieval-Augmented Generation
             </h2>
             <p className="text-sm leading-relaxed text-muted-foreground">
               Index private text as vector chunks, then ask questions. Embeddings
-              use OpenAI; answers use Groq. Set{' '}
-              <code className="text-foreground">AI_EMBEDDING_API_KEY</code> in
+              use the local Python service by default (OpenAI and Groq as
+              fallbacks). Set <code className="text-foreground">LOCAL_EMBEDDING_URL</code>{' '}
+              and optional <code className="text-foreground">AI_EMBEDDING_API_KEY</code> in
               server/.env.
             </p>
           </div>

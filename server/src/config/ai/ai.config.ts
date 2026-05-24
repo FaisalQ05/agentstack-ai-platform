@@ -56,6 +56,11 @@ export default registerAs('ai', () => {
     embeddingModel: primaryEmbedding.model,
     embeddingDimensions: primaryEmbedding.dimensions,
     embeddingApiKey: parsed.AI_EMBEDDING_API_KEY ?? parsed.AI_API_KEY,
+    localEmbeddingUrl: parsed.LOCAL_EMBEDDING_URL,
+    localEmbedding: {
+      timeoutMs: parsed.LOCAL_EMBEDDING_TIMEOUT_MS,
+      maxAttempts: parsed.LOCAL_EMBEDDING_MAX_RETRIES,
+    },
     fallback:
       fallback && fallbackEmbedding
         ? {

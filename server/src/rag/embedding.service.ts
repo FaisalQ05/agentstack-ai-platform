@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { AiService } from '../ai/ai.service';
+import { AiEmbeddingResult } from '../ai/interfaces/ai-provider.interface';
 import { TypedConfigService } from '../config/typed-config.service';
 
 @Injectable()
@@ -10,25 +11,17 @@ export class EmbeddingService {
   ) {}
 
   async embedQuery(text: string): Promise<number[]> {
-    const [embedding] = await this.embedTexts([text]);
-    return embedding;
+    const { embeddings } = await this.generate(text);
+    return embeddings[0];
   }
 
   async embedTexts(texts: string[]): Promise<number[][]> {
-    if (texts.length === 0) return [];
-
-    const trimmed = texts.map((t) => t.trim()).filter((t) => t.length > 0);
-    if (trimmed.length === 0) return [];
-
-    const { embeddings } = await this.aiService.embedWithFallback({
-      input: trimmed,
-      model: this.config.ai.embeddingModel,
-      dimensions: this.config.ai.embeddingDimensions,
-    });
-
-    this.assertVectorDimensions(embeddings);
-
+    const { embeddings } = await this.generateBatch(texts);
     return embeddings;
+  }
+
+  async embedTextsWithMeta(texts: string[]): Promise<AiEmbeddingResult> {
+    return this.generateBatch(texts);
   }
 
   get dimensions(): number {
@@ -41,6 +34,27 @@ export class EmbeddingService {
 
   get provider(): string {
     return this.config.ai.embeddingProvider;
+  }
+
+  private async generate(text: string): Promise<AiEmbeddingResult> {
+    const result = await this.aiService.generateEmbedding(text);
+    this.assertVectorDimensions(result.embeddings);
+    return result;
+  }
+
+  private async generateBatch(texts: string[]): Promise<AiEmbeddingResult> {
+    if (texts.length === 0) {
+      return { embeddings: [], model: this.model, provider: 'local' };
+    }
+
+    const trimmed = texts.map((t) => t.trim()).filter((t) => t.length > 0);
+    if (trimmed.length === 0) {
+      return { embeddings: [], model: this.model, provider: 'local' };
+    }
+
+    const result = await this.aiService.generateEmbeddings(trimmed);
+    this.assertVectorDimensions(result.embeddings);
+    return result;
   }
 
   private assertVectorDimensions(embeddings: number[][]): void {

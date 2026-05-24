@@ -7,22 +7,36 @@ import {
   ProviderName,
 } from './providers/create-provider';
 
+export type EmbeddingProviderName = 'local' | ProviderName;
+
 const CHAT_DEFAULTS = {
   openai: 'gpt-4o-mini',
   groq: 'llama-3.3-70b-versatile',
 } as const;
 
-/** Groq does not expose production embedding models — use OpenAI for vectors. */
+const LOCAL_EMBEDDING_DEFAULTS: ProviderEmbeddingConfig = {
+  model: 'all-MiniLM-L6-v2',
+  dimensions: 384,
+};
+
+/** Cloud embeddings align to local MiniLM dimensions for pgvector. */
 const EMBEDDING_DEFAULTS: Record<ProviderName, ProviderEmbeddingConfig> = {
-  openai: { model: 'text-embedding-3-small', dimensions: 768 },
-  groq: { model: 'text-embedding-3-small', dimensions: 768 },
+  openai: { model: 'text-embedding-3-small', dimensions: 384 },
+  groq: { model: 'text-embedding-3-small', dimensions: 384 },
 };
 
 export function resolveEmbeddingConfig(
-  provider: ProviderName,
+  provider: EmbeddingProviderName,
   modelOverride?: string,
   dimensionsOverride?: number,
 ): ProviderEmbeddingConfig {
+  if (provider === 'local') {
+    return {
+      model: modelOverride ?? LOCAL_EMBEDDING_DEFAULTS.model,
+      dimensions: dimensionsOverride ?? LOCAL_EMBEDDING_DEFAULTS.dimensions,
+    };
+  }
+
   const defaults = EMBEDDING_DEFAULTS[provider];
   return {
     model: modelOverride ?? defaults.model,
@@ -32,10 +46,10 @@ export function resolveEmbeddingConfig(
 
 export function resolveEmbeddingProvider(
   primary: ProviderName,
-  override?: ProviderName,
-): ProviderName {
+  override?: EmbeddingProviderName,
+): EmbeddingProviderName {
   if (override) return override;
-  return primary === 'groq' ? 'openai' : primary;
+  return 'local';
 }
 
 export function buildPrimaryProvider(config: TypedConfigService): AiProvider {
@@ -48,6 +62,16 @@ export function buildPrimaryProvider(config: TypedConfigService): AiProvider {
     embeddingDimensions,
     embeddingApiKey,
   } = config.ai;
+
+  /** RAG vectors use EmbeddingGeneratorService (local → openai → groq). */
+  if (embeddingProvider === 'local') {
+    return createAiProvider({
+      name: chatProvider,
+      apiKey,
+      chatModel: model,
+      embedding: resolveEmbeddingConfig(chatProvider),
+    });
+  }
 
   const chat = createAiProvider({
     name: chatProvider,
@@ -73,9 +97,9 @@ export function buildPrimaryProvider(config: TypedConfigService): AiProvider {
     embeddingProvider === 'openai' ? embeddingApiKey : apiKey;
 
   const embed = createAiProvider({
-    name: embeddingProvider,
+    name: embeddingProvider as ProviderName,
     apiKey: embedKey,
-    chatModel: getChatDefaultModel(embeddingProvider),
+    chatModel: getChatDefaultModel(embeddingProvider as ProviderName),
     embedding: resolveEmbeddingConfig(
       embeddingProvider,
       embeddingModel,

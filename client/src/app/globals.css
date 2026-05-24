@@ -136,4 +136,19 @@
       linear-gradient(to bottom, color-mix(in oklch, var(--foreground) 6%, transparent) 1px, transparent 1px);
     background-size: 24px 24px;
   }
+
+  .rag-hero {
+    background:
+      radial-gradient(
+        ellipse 80% 60% at 100% 0%,
+        color-mix(in oklch, var(--primary) 18%, transparent),
+        transparent 55%
+      ),
+      radial-gradient(
+        ellipse 60% 50% at 0% 100%,
+        color-mix(in oklch, var(--chart-3) 14%, transparent),
+        transparent 50%
+      ),
+      var(--card);
+  }
 }

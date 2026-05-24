@@ -11,4 +11,4 @@ RUN pnpm install
 
 EXPOSE 4000
 
-CMD ["pnpm", "start:dev"]
+CMD ["sh", "-c", "pnpm prisma migrate deploy && pnpm start:dev"]

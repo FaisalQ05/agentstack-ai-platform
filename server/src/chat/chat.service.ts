@@ -49,15 +49,23 @@ export class ChatService {
   }
 
   async prepareChat(dto: ChatRequestDto): Promise<ChatPreparedContext> {
+    console.log('PREPARING CHAT');
+    console.log({ dto });
+
+    // Find or create conversation
     const conversation = dto.conversationId
       ? await this.findConversation(dto.conversationId)
       : await this.createConversation(dto.system);
+
+    console.log({ conversation });
 
     if (
       dto.conversationId &&
       dto.system &&
       dto.system !== conversation.systemPrompt
     ) {
+      console.log('Updating system prompt');
+      // Update system prompt if it's different
       await this.prisma.conversation.update({
         where: { id: conversation.id },
         data: { systemPrompt: dto.system },
@@ -65,6 +73,7 @@ export class ChatService {
       conversation.systemPrompt = dto.system;
     }
 
+    // Save user message
     await this.prisma.message.create({
       data: {
         conversationId: conversation.id,
@@ -74,16 +83,21 @@ export class ChatService {
     });
 
     if (!conversation.title) {
+      console.log('Updating conversation title');
+      // Update conversation title if it's empty
       await this.prisma.conversation.update({
         where: { id: conversation.id },
         data: { title: this.buildTitle(dto.message) },
       });
     }
 
+    // Fetch history
     const history = await this.prisma.message.findMany({
       where: { conversationId: conversation.id },
       orderBy: { createdAt: 'asc' },
     });
+
+    console.log({ history });
 
     return {
       conversationId: conversation.id,
@@ -205,6 +219,8 @@ export class ChatService {
     history: Array<{ role: MessageRole; content: string }>,
   ): AiChatMessage[] {
     const messages: AiChatMessage[] = [];
+
+    console.log('Building AI messages');
 
     if (systemPrompt?.trim()) {
       messages.push({ role: 'system', content: systemPrompt.trim() });

@@ -24,11 +24,15 @@ export class ChatController {
     @Body() dto: ChatRequestDto,
     @Res() res: Response,
   ): Promise<void> {
+    console.log('streamMessage');
     initSse(res);
 
     try {
       const prepared = await this.chatService.prepareChat(dto);
+      console.log({ prepared });
       const meta = this.chatService.getStreamMeta();
+
+      console.log({ meta });
 
       writeSseEvent(res, 'meta', {
         conversationId: prepared.conversationId,
@@ -41,6 +45,7 @@ export class ChatController {
       for await (const delta of this.chatService.streamCompletion(
         prepared.aiMessages,
       )) {
+        console.log({ delta });
         fullContent += delta;
         writeSseEvent(res, 'token', { delta });
       }

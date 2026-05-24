@@ -3,7 +3,13 @@ import { AppShell } from '@/components/layout/AppShell';
 import { Button } from '@/components/ui/button';
 import { panelClassName } from '@/lib/ui-classes';
 import { cn } from '@/lib/utils';
-import { MessageSquare, Sparkles, Wand2 } from 'lucide-react';
+import {
+  Briefcase,
+  Database,
+  MessageSquare,
+  Sparkles,
+  Wand2,
+} from 'lucide-react';
 
 const features = [
   {
@@ -20,6 +26,20 @@ const features = [
     href: '/tools',
     icon: Wand2,
   },
+  {
+    title: 'RAG Knowledge Base',
+    description:
+      'Index documents with pgvector, retrieve top-K chunks, and get grounded answers.',
+    href: '/rag',
+    icon: Database,
+  },
+  {
+    title: 'Structured AI Tools',
+    description:
+      'Parse CVs, extract job entities, and match candidates with strict JSON + Zod validation.',
+    href: '/ai-tools',
+    icon: Briefcase,
+  },
 ];
 
 export default function Home() {
@@ -28,7 +48,7 @@ export default function Home() {
       title="AI Integration"
       description="Provider-agnostic MERN stack starter for OpenAI and Groq"
     >
-      <div className="grid gap-4 md:grid-cols-2">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-4">
         {features.map((feature) => (
           <article
             key={feature.href}

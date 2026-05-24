@@ -25,4 +25,8 @@ export class TypedConfigService {
   get ai(): AllConfig['ai'] {
     return this.configService.get('ai', { infer: true })!;
   }
+
+  get rag(): AllConfig['rag'] {
+    return this.configService.get('rag', { infer: true })!;
+  }
 }

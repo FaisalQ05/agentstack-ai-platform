@@ -2,8 +2,14 @@ import OpenAI from 'openai';
 import {
   AiCompletionOptions,
   AiCompletionResult,
+  AiEmbeddingOptions,
+  AiEmbeddingResult,
   AiProvider,
+  AiStructuredGenerateOptions,
+  AiStructuredGenerateResult,
 } from '../interfaces/ai-provider.interface';
+import { executeEmbedding } from './embedding';
+import { executeStructuredCompletion } from './structured-completion';
 
 export class OpenAiProvider implements AiProvider {
   readonly name = 'openai';
@@ -11,6 +17,8 @@ export class OpenAiProvider implements AiProvider {
   constructor(
     private readonly client: OpenAI,
     private readonly defaultModel: string,
+    private readonly embeddingModel: string,
+    private readonly embeddingDimensions: number,
   ) {}
 
   async complete(options: AiCompletionOptions): Promise<AiCompletionResult> {
@@ -34,9 +42,7 @@ export class OpenAiProvider implements AiProvider {
     };
   }
 
-  async *streamComplete(
-    options: AiCompletionOptions,
-  ): AsyncGenerator<string> {
+  async *streamComplete(options: AiCompletionOptions): AsyncGenerator<string> {
     const model = options.model ?? this.defaultModel;
 
     const stream = await this.client.chat.completions.create({
@@ -51,5 +57,26 @@ export class OpenAiProvider implements AiProvider {
         yield delta;
       }
     }
+  }
+
+  generateStructured(
+    options: AiStructuredGenerateOptions,
+  ): Promise<AiStructuredGenerateResult> {
+    return executeStructuredCompletion(
+      this.client,
+      this.name,
+      this.defaultModel,
+      options,
+    );
+  }
+
+  embed(options: AiEmbeddingOptions): Promise<AiEmbeddingResult> {
+    return executeEmbedding(
+      this.client,
+      this.name,
+      this.embeddingModel,
+      this.embeddingDimensions,
+      options,
+    );
   }
 }

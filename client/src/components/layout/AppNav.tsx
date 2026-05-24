@@ -8,6 +8,7 @@ const links = [
   { href: '/', label: 'Home' },
   { href: '/chat', label: 'Chat' },
   { href: '/tools', label: 'Tools' },
+  { href: '/rag', label: 'RAG' },
 ];
 
 export function AppNav() {

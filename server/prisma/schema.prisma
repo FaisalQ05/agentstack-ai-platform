@@ -35,3 +35,68 @@ model Message {
   @@index([conversationId])
   @@map("messages")
 }
+
+model ParsedCv {
+  id        String     @id @default(uuid())
+  rawText   String
+  result    Json
+  model     String
+  provider  String
+  createdAt DateTime   @default(now())
+  matches   JobMatch[]
+
+  @@map("parsed_cvs")
+}
+
+model JobPosting {
+  id        String     @id @default(uuid())
+  rawText   String
+  result    Json
+  model     String
+  provider  String
+  createdAt DateTime   @default(now())
+  matches   JobMatch[]
+
+  @@map("job_postings")
+}
+
+model JobMatch {
+  id        String      @id @default(uuid())
+  cvId      String?
+  jobId     String?
+  result    Json
+  model     String
+  provider  String
+  createdAt DateTime    @default(now())
+  cv        ParsedCv?   @relation(fields: [cvId], references: [id], onDelete: SetNull)
+  job       JobPosting? @relation(fields: [jobId], references: [id], onDelete: SetNull)
+
+  @@index([cvId])
+  @@index([jobId])
+  @@map("job_matches")
+}
+
+model RagDocument {
+  id        String     @id @default(uuid())
+  title     String
+  source    String?
+  metadata  Json?
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+  chunks    RagChunk[]
+
+  @@map("rag_documents")
+}
+
+/// Embeddings are stored in PostgreSQL pgvector column (managed via raw SQL).
+model RagChunk {
+  id         String      @id @default(uuid())
+  documentId String
+  document   RagDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  content    String
+  chunkIndex Int
+  createdAt  DateTime    @default(now())
+
+  @@index([documentId])
+  @@map("rag_chunks")
+}
